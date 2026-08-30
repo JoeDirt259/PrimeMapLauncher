@@ -90,7 +90,7 @@ int NextPrime(int afterThis) {
 
 // ---------- main search+launch coroutine ----------
 
-const int MAX_CONSECUTIVE_FAILURES = 50;
+const int MAX_CONSECUTIVE_FAILURES = 15;
 
 void LaunchCurrentMap() {
     LaunchMap(Setting_StartId);
@@ -108,13 +108,12 @@ void FindNextPrimeAndLaunchMap() {
 
         statusText = "Checking TMX id " + newMapId + "...";
         print("PrimeMapFinder: checking TMX id " + newMapId);
-        yield();
 
         // Check TMX for valid mapID
         string infoUrl = "https://trackmania.exchange/api/maps/get_map_info/id/" + newMapId;
         Net::HttpRequest@ infoReq = Net::HttpGet(infoUrl);
         while (!infoReq.Finished()) {
-            yield();
+            yield(300);
         }
 
         int code = infoReq.ResponseCode();
@@ -126,7 +125,6 @@ void FindNextPrimeAndLaunchMap() {
             // check the return for valid json with a TrackID
             if (info !is null && info.GetType() == Json::Type::Object && info.HasKey("TrackID")) {
                 failCount = 0;
-                yield();
                 bool launched = LaunchMap(newMapId);
                 if (launched) {
                     // Save launched candidate as new starting point
@@ -154,7 +152,7 @@ void FindNextPrimeAndLaunchMap() {
             statusText = "TMX request failed (" + code + ") for id " + newMapId + ".";
             NotifyError(statusText);
         }
-        yield();
+        yield(100);
     }
     if (failCount >= MAX_CONSECUTIVE_FAILURES) {
         statusText = "Search cancelled after " + MAX_CONSECUTIVE_FAILURES + " consecutive failures to find valid Map ID.";
@@ -182,9 +180,8 @@ bool LaunchMap(int mapId) {
     // change the menu page to avoid main menu bug where 3d scene not redrawn correctly (which can lead to a script error and `recovery restart...`)
     auto app = cast<CGameManiaPlanet>(GetApp());
     app.BackToMainMenu();
-    while (!app.ManiaTitleControlScriptAPI.IsReady) yield();
-    while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) yield();
-    yield();
+    while (!app.ManiaTitleControlScriptAPI.IsReady) yield(100);
+    while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) yield(100);
     UI::HideOverlay();
     app.ManiaTitleControlScriptAPI.PlayMap(url,"","");
     return true;
