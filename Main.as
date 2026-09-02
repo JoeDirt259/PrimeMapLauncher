@@ -148,19 +148,21 @@ void FindNextPrimeAndLaunchMap() {
             statusText = "No map with TMX id " + newMapId + ".";
             NotifyError(statusText);
         } else {
-            failCount++;
-            statusText = "TMX request failed (" + code + ") for id " + newMapId + ".";
+            // any other error code, treat as a request failure and cancel the search
+            failCount=-1;
+            searching = false;
+            statusText = "TMX HTTP request failed with code (" + code + ") for id " + newMapId + ".\nCancelling Search.";
             NotifyError(statusText);
         }
         yield(100);
     }
     if (failCount >= MAX_CONSECUTIVE_FAILURES) {
         statusText = "Search cancelled after " + MAX_CONSECUTIVE_FAILURES + " consecutive failures to find valid Map ID.";
-        NotifyError(statusText);
+    } else if (failCount == -1) {
+        statusText = "Search cancelled due to HTTP request failure.";
     } else if (!searching) {
         statusText = "Search cancelled by user.";
-        NotifyError(statusText);
-    }
+    } 
     NotifyError(statusText);
     searching = false;
 }
