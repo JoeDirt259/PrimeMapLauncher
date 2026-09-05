@@ -160,56 +160,7 @@ void FindNextPrimeAndLaunchMap() {
         statusText = "Checking TMX id " + newMapId;
         // print(statusText);
 
-        // Check TMX for valid mapID
-        // **************************
-
-        // string infoUrl = "https://trackmania.exchange/api/maps/get_map_info/id/" + newMapId;
-        // Net::HttpRequest@ infoReq = Net::HttpGet(infoUrl);
-        // while (!infoReq.Finished()) {
-        //     yield(300);
-        // }
-        // int code = infoReq.ResponseCode();
-        // string body = infoReq.String();
-        /*
-         if (code == 200) {
-          Json::Value@ info = Json::Parse(body);
-
-            // check the return for valid json with a TrackID
-            if (info !is null && info.GetType() == Json::Type::Object && info.HasKey("TrackID")) {
-                failCount = 0;
-                bool launched = LaunchMap(newMapId);
-                if (launched) {
-                    // Save launched candidate as new starting point
-                    Setting_StartId = newMapId;
-                    statusText = "Launched map " + newMapId;
-                    NotifyMessage(statusText);
-                    searching = false;
-                    return;
-                } else {
-                    failCount++;
-                    statusText = "MapID " + newMapId + " found but launch failed.";
-                    NotifyError(statusText);
-                }
-            } else {
-                failCount++;
-                statusText = "No map with TMX id " + newMapId + ".";
-                NotifyError(statusText);
-            }
-        } else if (code == 404) {
-            failCount++;
-            statusText = "No map with TMX id " + newMapId + ".";
-            NotifyError(statusText);
-        } else {
-            // any other error code, treat as a request failure and cancel the search
-            failCount=-1;
-            searching = false;
-            statusText = "TMX HTTP request failed with code (" + code + ") for id " + newMapId + ".\nCancelling Search.";
-            NotifyError(statusText);
-        }
-         }
-             */
-
-        // new code to check if map exists with retry and timeout
+        // check if map exists with retry and timeout
         int doesMapExist = DoesMapExistForMapId(newMapId);
         if (doesMapExist == 1) {
             failCount = 0;
@@ -256,14 +207,6 @@ void LaunchMapFromIdOrNadeoServer(int mapId, string onlineMapId) {
     }
 }
 
-            // if (lastCheckedOnlineMapId.Length > 0) {
-            //     statusText = "TMX Found MapId:" + Setting_StartId + " OnlineMapId:" + lastCheckedOnlineMapId;
-            //     NotifyMessage(statusText);
-            // }
-            // else {
-            //     LaunchMap(Setting_StartId);
-            // }
-
 bool LaunchMapFromOnlineId(int mapId, string onlineMapId) {
     // statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server OnlineMapId: " + onlineMapId;
     statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server";
@@ -293,9 +236,9 @@ void LaunchMap(int mapId) {
     statusText = "Attempting to launch mapId " + mapId + " from TMX Server";
     yield(); // yield and allow display updates
     string url;
-    // url = "https://trackmania.exchange/maps/download/" + mapId; // old api
 
     url = "https://trackmania.exchange//mapgbx/" + mapId; // v2 api
+    // Moved to const bool HAS_PERMISSIONS and Render() to enable plugin or alert user they need club access, so does not seem necessary here any more. 
     // if (!Permissions::PlayLocalMap()) {
     //     statusText = "Cannot Load Map.  Club access required";  
     //     NotifyError(statusText);
@@ -339,10 +282,7 @@ int DoesMapExistForMapId(int mapId) {
     statusText = "Checking TMX for mapId " + mapId;
     lastCheckedOnlineMapId = ""; // reset the last checked online map id before making the request
     yield(); // yield and allow display updates
-    // string mapUrl = "https://trackmania.exchange/api/maps/get_map_info/id/" + mapId;
     string mapUrl = "https://trackmania.exchange/api/maps?id=" + mapId + "&fields=MapId%2COnlineMapId";  // new api
-    // https://trackmania.exchange/api/maps?id=123&fields=MapId%2COnlineMapId
-    //https://trackmania.exchange/api/maps?id=123&fields=MapId
     print(mapUrl);
     Net::HttpRequest@ mapReq = TmxMapInfoRequestWithRetry(mapUrl);
     yield();  // yield for display updates, even though TMXMapInfoRequestWithRetry will yield internally, we are just adding this to be safe
@@ -355,8 +295,6 @@ int DoesMapExistForMapId(int mapId) {
             Json::Value@ info = mapReq.Json();
             // if (info !is null && info.GetType() == Json::Type::Object && info.HasKey("TrackID")){ // old api
             print(mapReq.String());
-            // if (info !is null && info.GetType() == Json::Type::Object && info.HasKey("Results") && info["Results"].GetType() == Json::Type::Object && info["Results"].HasKey("MapId")) { // new api
-
             if (info !is null && info.GetType() == Json::Type::Object && ResultsHaveMapId(info)) { // new api
                 statusText = "TMX Found MapId:" + mapId;
                 if (lastCheckedOnlineMapId.Length > 0) {
@@ -364,7 +302,6 @@ int DoesMapExistForMapId(int mapId) {
                 }
                 print(statusText);
                 yield();
-                // NotifyMessage(statusText);
                 return 1;
             }
             else {
