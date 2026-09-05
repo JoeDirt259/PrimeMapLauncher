@@ -24,6 +24,15 @@ const string PluginIcon = Icons::Dodecahedron;
 const string MenuTitle = "\\$fe0" + PluginIcon + "\\$z " + Meta::ExecutingPlugin().Name;
 
 
+// Feature Ideas for the Future
+//
+//TODO: possibly, add Main() and check HAS_PERMISSIONS there, and notify with error if no permissions and just unload the plugin at that point.
+/*
+Other Possible Ideas:
+    -Log Played and Missing Maps to a Log Window, so user can get a report of Map Success at end of day
+        -Possible make log text a setting string, so if there is a game crash, the lgo is not lost
+
+*/
 void RenderMenu() {
     if (UI::MenuItem(MenuTitle, "", showWindow)) {
         showWindow = !showWindow;
@@ -34,8 +43,6 @@ void Render() {
     if (!UI::IsOverlayShown() || !showWindow) {
         return; 
     }
-
-
 
     UI::SetNextWindowSize(550, 350, UI::Cond::FirstUseEver);
     if (UI::Begin(MenuTitle, showWindow)) {
@@ -50,12 +57,9 @@ void Render() {
             UI::Text("Current/Starting Map ID");
             Setting_StartId = UI::InputUint("##startid", Setting_StartId);
             Setting_StartId = Math::Clamp(Setting_StartId, 1, 999999);
-
             UI::Dummy(vec2(0, 4));
-
             UI::Separator();
             UI::Dummy(vec2(0, 4));
-
             // Launch Current Map Button, check for TMX existence first, if it does not exist alert the user and do not attempt to launch the map
             if (UI::Button("Load Current Map")) {
             startnew(LaunchCurrentMapCheckExistenceFirst);
@@ -156,9 +160,6 @@ void FindNextPrimeAndLaunchMap() {
         newMapId = NextPrime(newMapId);
         // Save the new map ID as the new starting point so if we reach max fails or user cancels they can continue without a manual update of mapID
         Setting_StartId = newMapId;
-
-        statusText = "Checking TMX id " + newMapId;
-        // print(statusText);
 
         // check if map exists with retry and timeout
         int doesMapExist = DoesMapExistForMapId(newMapId);
@@ -283,24 +284,18 @@ int DoesMapExistForMapId(int mapId) {
     lastCheckedOnlineMapId = ""; // reset the last checked online map id before making the request
     yield(); // yield and allow display updates
     string mapUrl = "https://trackmania.exchange/api/maps?id=" + mapId + "&fields=MapId%2COnlineMapId";  // new api
-    print(mapUrl);
     Net::HttpRequest@ mapReq = TmxMapInfoRequestWithRetry(mapUrl);
     yield();  // yield for display updates, even though TMXMapInfoRequestWithRetry will yield internally, we are just adding this to be safe
     if (mapReq !is null) {
         int code = mapReq.ResponseCode();
         if (code == 200) {
-            // check the return json for valid json with a TrackID
-            // string body = mapReq.String();
-            // Json::Value@ info = Json::Parse(body);
+            // check the return json for valid json with a MapId
             Json::Value@ info = mapReq.Json();
-            // if (info !is null && info.GetType() == Json::Type::Object && info.HasKey("TrackID")){ // old api
-            print(mapReq.String());
-            if (info !is null && info.GetType() == Json::Type::Object && ResultsHaveMapId(info)) { // new api
+            if (info !is null && info.GetType() == Json::Type::Object && ResultsHaveMapId(info)) { 
                 statusText = "TMX Found MapId:" + mapId;
                 if (lastCheckedOnlineMapId.Length > 0) {
                     statusText += " OnlineMapId:" + lastCheckedOnlineMapId;
                 }
-                print(statusText);
                 yield();
                 return 1;
             }
@@ -328,8 +323,7 @@ int DoesMapExistForMapId(int mapId) {
     return -1;
 }
 
-bool ResultsHaveMapId(Json::Value@ theJson)
-    {   
+bool ResultsHaveMapId(Json::Value@ theJson) {   
     // Look for MapId in results.. will only exist if the map exists.
     // we could go further and verify that the MapId matches the requested mapId, but for now we will just check if it exists in the results, as that seems redundant
     // sets global lastCheckedOnlineMapId to the OnlineMapId if it exists, otherwise it will be set to an empty string
