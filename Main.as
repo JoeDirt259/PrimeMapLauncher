@@ -215,7 +215,7 @@ void FindNextPrimeAndLaunchMap() {
     }
     if (failCount >= MAX_CONSECUTIVE_FAILURES) {
         searching = false;
-        statusText = "Search cancelled after " + MAX_CONSECUTIVE_FAILURES + " consecutive failures to find valid Map ID.\Launching SearchMap API to Find Next Valid Prime Map Instead";
+        statusText = "Search cancelled after " + MAX_CONSECUTIVE_FAILURES + " consecutive failures to find valid Map ID.\nLaunching SearchMap API to Find Next Valid Prime Map Instead";
         NotifyError(statusText);
         yield();
         RunMapListSearch();
