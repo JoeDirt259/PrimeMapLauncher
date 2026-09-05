@@ -14,6 +14,9 @@ Added a 2 second timeout on TMX request with automatic cancel and retry up to 3 
 Reduced HTTP yield to 150ms from 300ms.  300ms was laggy, and request was always ready in 150ms or less in my testing
 Other small internal changes/optimizations
 
+Added Search Map API to get map list as backup to cover large gaps.
+
+
 
 Release History Version/Date
 v1.0.0 ????
