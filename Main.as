@@ -7,19 +7,24 @@
 // After successfully finding a valid map it will update the Current Map ID
 
 // Testing Notes:
-// mapID 3163 does not exist, if we need testing for a non exiting map
+// mapID 3163 is a prime map that does not exist, if we need testing for a non exiting map
+// mapID 5040 is last valid map till 15032 so good testing start point for large gaps
 
 
 const bool HAS_PERMISSIONS = Permissions::PlayLocalMap();
 
 [Setting hidden]
 uint Setting_StartId = 1;
+// [Setting hidden]
 
 bool searching = false;
+bool searchingMapsList = false;
 string statusText = "";
 bool showWindow = true;
 string lastCheckedOnlineMapId = "";
+uint lastMapSuccessfullyLoaded = 1;
 
+const int MAX_CONSECUTIVE_FAILURES = 5;
 const string PluginIcon = Icons::Dodecahedron;
 const string MenuTitle = "\\$fe0" + PluginIcon + "\\$z " + Meta::ExecutingPlugin().Name;
 
@@ -27,6 +32,19 @@ const string MenuTitle = "\\$fe0" + PluginIcon + "\\$z " + Meta::ExecutingPlugin
 // Feature Ideas for the Future
 //
 //TODO: possibly, add Main() and check HAS_PERMISSIONS there, and notify with error if no permissions and just unload the plugin at that point.
+//TODO: add api call to search for next valid maps when there are huge blocks of maps missing
+/*
+exmaples api calls
+calls must use a valid mapID for after,before,and from or they fall
+currnetly api returns maps in the reverse of what is expected. ie before list mapIds higher than before=mapID
+https://trackmania.exchange/api/maps?after=58&count=10&fields=MapId
+https://trackmania.exchange/api/maps?before=58&count=10&fields=MapId
+https://trackmania.exchange/api/maps?from=58&count=10&fields=MapId
+
+So to find next prime we should just use this call to grab the number of maps from current map to prime.. see if prime exists in that list.. 
+if not use the next valid mapid higher than that prime number to use for the next search.
+
+*/
 /*
 Other Possible Ideas:
     -Log Played and Missing Maps to a Log Window, so user can get a report of Map Success at end of day
@@ -44,7 +62,7 @@ void Render() {
         return; 
     }
 
-    UI::SetNextWindowSize(550, 350, UI::Cond::FirstUseEver);
+    UI::SetNextWindowSize(550, 400, UI::Cond::FirstUseEver);
     if (UI::Begin(MenuTitle, showWindow)) {
         if (!HAS_PERMISSIONS) { 
             UI::Text("Club Access is required for this plugin.");
@@ -78,12 +96,20 @@ void Render() {
             }
             UI::SameLine();
             UI::Text("Launch next Existing Prime Map");
-            if (searching) {
+            // Find Prime Via Map Search
+            if (UI::Button("Load Next Prime Map(SearchMaps)")) {
+            startnew(RunMapListSearch);
+            }
+            UI::SameLine();
+            UI::Text("Find Next Prime Via SearchMap API\n(Slower, but works when there are\nlarge gap of missing maps)");
+
+            if (searching || searchingMapsList) {
                 UI::Text("Searching...");
                 UI::SameLine();
                 // cancel button
                     if (UI::Button("Cancel Search...")) {
                         searching = false;
+                        searchingMapsList = false;
                         statusText = "Cancelling request...";
                     }
                 UI::Dummy(vec2(0, 4));
@@ -122,7 +148,6 @@ int NextPrime(int afterThis) {
 
 // ---------- main search+launch coroutine ----------
 
-const int MAX_CONSECUTIVE_FAILURES = 15;
 
 void LaunchCurrentMap() {
     // Attempt to launch the map for the current map ID without checking if it exists first
@@ -155,16 +180,16 @@ void FindNextPrimeAndLaunchMap() {
     searching = true;
     int newMapId = Setting_StartId;
     int failCount = 0;
+    lastMapSuccessfullyLoaded = Setting_StartId;
 
     while (failCount < MAX_CONSECUTIVE_FAILURES && searching == true) {
         newMapId = NextPrime(newMapId);
         // Save the new map ID as the new starting point so if we reach max fails or user cancels they can continue without a manual update of mapID
-        Setting_StartId = newMapId;
-
         // check if map exists with retry and timeout
         int doesMapExist = DoesMapExistForMapId(newMapId);
         if (doesMapExist == 1) {
             failCount = 0;
+            Setting_StartId = newMapId;
             LaunchMapFromIdOrNadeoServer(newMapId, lastCheckedOnlineMapId);
             // Save launched candidate as new starting point
             Setting_StartId = newMapId;
@@ -189,18 +214,22 @@ void FindNextPrimeAndLaunchMap() {
         yield(100);
     }
     if (failCount >= MAX_CONSECUTIVE_FAILURES) {
-        statusText = "Search cancelled after " + MAX_CONSECUTIVE_FAILURES + " consecutive failures to find valid Map ID.";
+        searching = false;
+        statusText = "Search cancelled after " + MAX_CONSECUTIVE_FAILURES + " consecutive failures to find valid Map ID.\Launching SearchMap API to Find Next Valid Prime Map Instead";
+        NotifyError(statusText);
+        yield();
+        RunMapListSearch();
+        return;
     } else if (failCount == -1) {
         statusText = "Search cancelled by user.";
     } else if (!searching) {
         statusText = "Search cancelled due to HTTP request failure.";
-
     } 
-    NotifyError(statusText);
     searching = false;
+    NotifyError(statusText);
 }
 
-void LaunchMapFromIdOrNadeoServer(int mapId, string onlineMapId) {
+void LaunchMapFromIdOrNadeoServer(int mapId, const string &in onlineMapId) {
     if (onlineMapId.Length > 0) {
         LaunchMapFromOnlineId(mapId, onlineMapId);
     } else {
@@ -208,7 +237,7 @@ void LaunchMapFromIdOrNadeoServer(int mapId, string onlineMapId) {
     }
 }
 
-bool LaunchMapFromOnlineId(int mapId, string onlineMapId) {
+bool LaunchMapFromOnlineId(int mapId, const string &in onlineMapId) {
     // statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server OnlineMapId: " + onlineMapId;
     statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server";
     yield(); // yield and allow display updates
@@ -273,8 +302,119 @@ void NotifyError(const string &in msg) {
 }
 
 
+void RunMapListSearch() {
+    int nextValidPrime = Setting_StartId;
+    bool done=false;
+    searchingMapsList = true;
+   do  {
+        nextValidPrime = NextExistingPrimeMapOrMapIdHigherThanOurPrimeFromSearchMapListApi(nextValidPrime);
+        if (nextValidPrime<0) {
+            // Error on MapList Processing - lets bump out
+            // status text has already been updated by MapProcessor
+            searchingMapsList = false;
+        }
+        else if (IsPrime(nextValidPrime)) {
+            Setting_StartId = nextValidPrime;
+            statusText = "Found Next Valid Prime Map At " + nextValidPrime;
+            done = true;
+            searchingMapsList = false;
+            LaunchCurrentMapCheckExistenceFirst();
+        }
+        sleep(10);
+   }
+   while (!done && searchingMapsList);
+}
+
+// after seeing MAX_CONSECUTIVE_FAILURES number of failure to find maps we will use this to skip large gaps of missing maps
+// the Current MapId MUST EXIST or the API fails
+// Takes Last Map Loaded, hopefully the last or starting map was a good map #
+int NextExistingPrimeMapOrMapIdHigherThanOurPrimeFromSearchMapListApi(int currentMapId) {
+    // Returns NextExistingPrimeMap Number or MapID higher(pass large missing map gaps) to use as a new starting point
+    // -1 if we receceive an empyt map list
+    // -2 if we the request fails or time outs
+
+    // Outline
+    // Next Prime
+    // Number of Maps Between Current and Next Prime
+    // Grab that many maps, and theoretically we should get a map # thats exists higher than the last might id we can use to generate a new prime # from or use if
+    // it happens to be prime with this same search
+    // or we get the next valid prime using this higher valid map number as our new starting point.
+
+    //API Example
+    //https://trackmania.exchange/api/maps?before=36929&count=10&fields=MapId
+    int newMapId = 0;
+    int nextPrimeMapId = NextPrime(currentMapId);
+    int numberOfMapsToGet = nextPrimeMapId-currentMapId;
+    searching = true; // activates cancel button and required for TmxMapInfoRequestWithRetry
+    string reqUrl = "https://trackmania.exchange/api/maps?before=" + currentMapId + "&count=" + numberOfMapsToGet + "&fields=MapId";
+    // statusText = "Searching for next valid mapID with url " + reqUrl;
+    statusText = "Searching via Map Search API...";
+    yield();
+    Net::HttpRequest@ mapListReq = TmxMapInfoRequestWithRetry(reqUrl);
+    if (mapListReq !is null) {
+            int code = mapListReq.ResponseCode();
+            if (code == 200) {
+                // parse the return json for valid json with an Array of MapIds
+                Json::Value@ infoJson = mapListReq.Json();
+                if (infoJson !is null && infoJson.GetType() == Json::Type::Object) { 
+                    if (infoJson.HasKey("Results") && infoJson["Results"].GetType() == Json::Type::Array) {
+                        Json::Value@ resultsArray = infoJson["Results"];
+                        // Loop array in reverse as thats the order of the values returned by the API
+                        // Either find the prime we're looking for or find a valid mapID higher than the prime we're looking for return that as a new starting point
+                        if (resultsArray.Length>0) {
+                            for (int i = resultsArray.Length - 1; i >= 0; i--){
+                                Json::Value@ itemJson = resultsArray[i];
+                                if (itemJson.HasKey("MapId") && itemJson["MapId"].GetType() == Json::Type::Number) {
+                                    Json::Value@ mapId = itemJson["MapId"];
+                                    int loopingMapId = mapId;
+                                    if (loopingMapId>=nextPrimeMapId) {
+                                        // Either we found our prime or we have a new starting point
+                                        newMapId = loopingMapId;
+                                        searching = false;
+                                        // statusText = "Found Next Prime Or Valid MAPID Greater than next prime " + newMapId;
+                                        // print(statusText);
+                                        // yield();
+                                        return newMapId;
+                                    }
+                                    // Do something with 'mapId' here (e.g., Print, store in an array, etc.)
+                                    // string someText = "Found MapId: " + loopingMapId;
+                                    // print(someText);
+                                }
+                            }
+                        }
+                        else {
+                            searching = false;
+                            statusText = "Starting mapID must be valid or we get no results from Map List API.\nCheck Starting Map Id";
+                            NotifyError(statusText);
+                            return -1;
+                        }
+                        
+                    } 
+                }
+                else {
+                    // Invalid JSON
+                    searching = false;
+                    statusText = "Search Map HTTP Request Received Invalid Response";
+                    NotifyError(statusText);
+                    return -1; 
+                }
+            }
+            else {
+                // any other request code is an error, treat as a request failure and cancel the search
+                // searching = false;
+                statusText = "TMX HTTP request failed with code (" + code + ") for url " + reqUrl + ".\nCancelling Search.";
+                NotifyError(statusText);
+                searching = false;
+                return -2; // request failed
+            }
+    }
+    searching = false;
+    statusText="Unknown Failure Processing Search Map API Response";
+    return -1; // Probably should never get here
+}
 
 int DoesMapExistForMapId(int mapId) {
+// Checks TMX v2 API for existence of mapId and OnlineMapId
 // Returns 1 if map exists, 0 if map does not exist, -1 user canceled the search, -2 if request failed/timed out
 // assumes seardching is true before calling TmxMapInfoRequestWithRetry so that the request can check if the user has cancelled the search
 // we should clean this global searching var stuff up at some point.. but it works for now.. haha,.. this is what shitty code looks like when you're learning a new language and API
@@ -283,6 +423,8 @@ int DoesMapExistForMapId(int mapId) {
     statusText = "Checking TMX for mapId " + mapId;
     lastCheckedOnlineMapId = ""; // reset the last checked online map id before making the request
     yield(); // yield and allow display updates
+    // Example API Call
+    // https://trackmania.exchange/api/maps?id=123&fields=MapId%2COnlineMapId
     string mapUrl = "https://trackmania.exchange/api/maps?id=" + mapId + "&fields=MapId%2COnlineMapId";  // new api
     Net::HttpRequest@ mapReq = TmxMapInfoRequestWithRetry(mapUrl);
     yield();  // yield for display updates, even though TMXMapInfoRequestWithRetry will yield internally, we are just adding this to be safe
