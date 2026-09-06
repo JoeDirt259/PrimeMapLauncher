@@ -32,19 +32,7 @@ const string MenuTitle = "\\$fe0" + PluginIcon + "\\$z " + Meta::ExecutingPlugin
 // Feature Ideas for the Future
 //
 //TODO: possibly, add Main() and check HAS_PERMISSIONS there, and notify with error if no permissions and just unload the plugin at that point.
-//TODO: add api call to search for next valid maps when there are huge blocks of maps missing
-/*
-exmaples api calls
-calls must use a valid mapID for after,before,and from or they fall
-currnetly api returns maps in the reverse of what is expected. ie before list mapIds higher than before=mapID
-https://trackmania.exchange/api/maps?after=58&count=10&fields=MapId
-https://trackmania.exchange/api/maps?before=58&count=10&fields=MapId
-https://trackmania.exchange/api/maps?from=58&count=10&fields=MapId
 
-So to find next prime we should just use this call to grab the number of maps from current map to prime.. see if prime exists in that list.. 
-if not use the next valid mapid higher than that prime number to use for the next search.
-
-*/
 /*
 Other Possible Ideas:
     -Log Played and Missing Maps to a Log Window, so user can get a report of Map Success at end of day
