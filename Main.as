@@ -11,7 +11,8 @@
 // mapID 5040 is last valid map till 15032 so good testing start point for large gaps
 
 
-const bool HAS_PERMISSIONS = Permissions::PlayLocalMap();
+// const bool HAS_PERMISSIONS = Permissions::PlayLocalMap();
+const bool HAS_PERMISSIONS = false;
 
 [Setting hidden]
 uint Setting_StartId = 1;
@@ -39,6 +40,16 @@ Other Possible Ideas:
         -Possible make log text a setting string, so if there is a game crash, the lgo is not lost
 
 */
+
+void Main() {
+        if (!HAS_PERMISSIONS) {
+        NotifyError("Club Access Required to use this plugin\nUnloading Plugin");
+        Meta::Plugin@ self = Meta::ExecutingPlugin();
+        Meta::UnloadPlugin(self);
+        return;
+    }
+}
+
 void RenderMenu() {
     if (UI::MenuItem(MenuTitle, "", showWindow)) {
         showWindow = !showWindow;
