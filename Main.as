@@ -11,8 +11,7 @@
 // mapID 5040 is last valid map till 15032 so good testing start point for large gaps
 
 
-// const bool HAS_PERMISSIONS = Permissions::PlayLocalMap();
-const bool HAS_PERMISSIONS = false;
+const bool HAS_PERMISSIONS = Permissions::PlayLocalMap();
 
 [Setting hidden]
 uint Setting_StartId = 1;
