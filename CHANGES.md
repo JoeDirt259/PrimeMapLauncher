@@ -13,6 +13,8 @@ Reduced HTTP yield to 150ms from 300ms.  300ms was laggy, and request was always
 Other small internal changes/optimizations
 Added Search Map API to get map list as backup to cover large gaps.
 
+Added Permissions::PlayLocalMap() in LaunchMap()
+Changed yields to sleep where appropriate
 
 
 Release History Version/Date

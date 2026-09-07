@@ -39,9 +39,9 @@ const string MenuTitle = "\\$fe0" + PluginIcon + "\\$z " + Meta::ExecutingPlugin
 //Main
 void Main() {
         if (!Permissions::PlayLocalMap()) {
-        NotifyError("Club Access Required to use this plugin\nUnloading Plugin");
-        Meta::Plugin@ self = Meta::ExecutingPlugin();
-        Meta::UnloadPlugin(self);
+            NotifyError("Club Access Required to use this plugin\nUnloading Plugin");
+            Meta::Plugin@ self = Meta::ExecutingPlugin();
+            Meta::UnloadPlugin(self);
         return;
     }
 }
@@ -201,7 +201,7 @@ void FindNextPrimeAndLaunchMap() {
             statusText = "TMX HTTP request timeout or error\nCancelling Search.";
              NotifyError(statusText);
         }
-        yield(100);
+        sleep(100);
     }
     if (failCount >= MAX_CONSECUTIVE_FAILURES) {
         searching = false;
@@ -228,23 +228,22 @@ void LaunchMapFromIdOrNadeoServer(int mapId, const string &in onlineMapId) {
 }
 
 bool LaunchMapFromOnlineId(int mapId, const string &in onlineMapId) {
-    // statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server OnlineMapId: " + onlineMapId;
-    statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server";
-    yield(); // yield and allow display updates
-    string url;
-
-    // "https://core.trackmania.nadeo.live/maps/" + map.OnlineMapId + "/file" to app.ManiaTitleControlScriptAPI.PlayMap
-    url = "https://core.trackmania.nadeo.live/maps/" + onlineMapId + "/file";  // Nadeo Server OnlineMapId URL
     if (!Permissions::PlayLocalMap()) {
         statusText = "Cannot Load Map.  Club access required";  
         NotifyError(statusText);
         return false;
     }
+    // statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server OnlineMapId: " + onlineMapId;
+    statusText = "Attempting to launch mapId: " + mapId + " from Nadeo Server";
+    yield(); // yield and allow display updates
+    string url;
+    // "https://core.trackmania.nadeo.live/maps/" + map.OnlineMapId + "/file" to app.ManiaTitleControlScriptAPI.PlayMap
+    url = "https://core.trackmania.nadeo.live/maps/" + onlineMapId + "/file";  // Nadeo Server OnlineMapId URL
     // change the menu page to avoid main menu bug where 3d scene not redrawn correctly (which can lead to a script error and `recovery restart...`)
     auto app = cast<CGameManiaPlanet>(GetApp());
     app.BackToMainMenu();
-    while (!app.ManiaTitleControlScriptAPI.IsReady) yield(100);
-    while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) yield(100);
+    while (!app.ManiaTitleControlScriptAPI.IsReady) sleep(100);
+    while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) sleep(100);
     UI::HideOverlay();
     app.ManiaTitleControlScriptAPI.PlayMap(url,"","");
     statusText = "Launched mapId: " + mapId + " from Nadeo Server";
@@ -253,6 +252,11 @@ bool LaunchMapFromOnlineId(int mapId, const string &in onlineMapId) {
 }
 
 void LaunchMap(int mapId) {
+    if (!Permissions::PlayLocalMap()) {
+        statusText = "Cannot Load Map.  Club access required";  
+        NotifyError(statusText);
+        return;
+    }
     statusText = "Attempting to launch mapId " + mapId + " from TMX Server";
     yield(); // yield and allow display updates
     string url;
@@ -261,8 +265,8 @@ void LaunchMap(int mapId) {
     // change the menu page to avoid main menu bug where 3d scene not redrawn correctly (which can lead to a script error and `recovery restart...`)
     auto app = cast<CGameManiaPlanet>(GetApp());
     app.BackToMainMenu();
-    while (!app.ManiaTitleControlScriptAPI.IsReady) yield(100);
-    while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) yield(100);
+    while (!app.ManiaTitleControlScriptAPI.IsReady) sleep(100);
+    while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) sleep(100);
     UI::HideOverlay();
     app.ManiaTitleControlScriptAPI.PlayMap(url,"","");
     statusText = "Launched mapId: " + mapId + " from TMX Server";
@@ -368,7 +372,7 @@ int NextExistingPrimeMapOrMapIdHigherThanOurPrimeFromSearchMapListApi(int curren
                         }
                         else {
                             searching = false;
-                            statusText = "Starting mapID must be valid or we get no results from Map List API.\nCheck Starting Map Id";
+                            statusText = "Starting mapID must be valid or we get no results from Map List API.\nCheck Starting MapId";
                             NotifyError(statusText);
                             return -1;
                         }
@@ -393,8 +397,9 @@ int NextExistingPrimeMapOrMapIdHigherThanOurPrimeFromSearchMapListApi(int curren
             }
     }
     searching = false;
-    statusText="Unknown Failure Processing Search Map API Response";
-    return -1; // Probably should never get here
+    statusText="Error Processing Search Map API Response, Check Starting MapId is a Valid Map.\nStarting mapID must be valid or we get no results from Map List API.";
+    NotifyError(statusText);
+    return -1; 
 }
 
 int DoesMapExistForMapId(int mapId) {
@@ -501,7 +506,7 @@ Net::HttpRequest@ TmxMapInfoRequestWithRetry(const string &in url, uint maxAttem
         Net::HttpRequest@ req = Net::HttpGet(url);
         uint64 start = Time::Now;
         bool timedOut = false;
-        yield(150); // give the request some time
+        sleep(150); // give the request some time
         bool simulateTimeout = false; // set to true to simulate a timeout for testing
         while ((!req.Finished() && searching) || simulateTimeout) {
             if (Time::Now - start > timeoutMs) {
@@ -509,7 +514,7 @@ Net::HttpRequest@ TmxMapInfoRequestWithRetry(const string &in url, uint maxAttem
                 timedOut = true;
                 break;
             }
-            yield(150);
+            sleep(150);
         }
         if (!searching) {
             statusText = "TMX request cancelled by user for URL: " + url;
