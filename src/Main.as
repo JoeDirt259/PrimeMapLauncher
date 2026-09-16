@@ -112,6 +112,10 @@ void RenderMenuMain() {
         return;
     }
     if (UI::BeginMenu(MenuBarTitle)) {
+        UI::Text("Current Map ID: " + Setting_StartId);
+        // UI::Text("Current Map ID:");
+        // Setting_StartId = UI::InputUint("##startid", Setting_StartId);
+        // Setting_StartId = Math::Clamp(Setting_StartId, 1, 999999);
         if (UI::Button("Load Next Prime Map")) {
             startnew(FindNextPrimeAndLaunchMap);
         }   
