@@ -3,6 +3,7 @@
 
 void LaunchCurrentMap() {
     // Attempt to launch the map for the current map ID without checking if it exists first
+    // The also also wont check map mode
     LaunchMap(Setting_StartId);
 }
 
@@ -13,7 +14,8 @@ void LaunchCurrentMapCheckExistenceFirst() {
     int result = DoesMapExistForMapId(Setting_StartId);
     searching = false;
     if (result == 1) {
-        LaunchMapFromIdOrNadeoServer(Setting_StartId, lastCheckedOnlineMapId);
+        string loadMode = ModeFromMapType(lastCheckedMapType);
+        LaunchMapFromIdOrNadeoServer(Setting_StartId, lastCheckedOnlineMapId, loadMode);
         return;
     }
     else if (result == 0) {
@@ -42,8 +44,8 @@ void FindNextPrimeAndLaunchMap() {
         if (doesMapExist == 1) {
             failCount = 0;
             Setting_StartId = newMapId;
-            LaunchMapFromIdOrNadeoServer(newMapId, lastCheckedOnlineMapId);
-            // Save launched candidate as new starting point
+            string loadMode = ModeFromMapType(lastCheckedMapType);
+            LaunchMapFromIdOrNadeoServer(Setting_StartId, lastCheckedOnlineMapId, loadMode);            // Save launched candidate as new starting point
             Setting_StartId = newMapId;
             searching = false;
             return;
@@ -85,15 +87,15 @@ void FindNextPrimeAndLaunchMap() {
 // Launch Functions
 //
 
-void LaunchMapFromIdOrNadeoServer(int mapId, const string &in onlineMapId) {
+void LaunchMapFromIdOrNadeoServer(int mapId, const string &in onlineMapId, const string &in loadMode = "") {
     if (onlineMapId.Length > 0) {
-        LaunchMapFromOnlineId(mapId, onlineMapId);
+        LaunchMapFromOnlineId(mapId, onlineMapId, loadMode);
     } else {
-        LaunchMap(mapId);
+        LaunchMap(mapId, loadMode);
     }
 }
 
-bool LaunchMapFromOnlineId(int mapId, const string &in onlineMapId) {
+bool LaunchMapFromOnlineId(int mapId, const string &in onlineMapId, const string &in loadMode = "") {
     if (!Permissions::PlayLocalMap()) {
         statusText = "Cannot Load Map.  Club access required";  
         NotifyError(statusText);
@@ -111,13 +113,13 @@ bool LaunchMapFromOnlineId(int mapId, const string &in onlineMapId) {
     while (!app.ManiaTitleControlScriptAPI.IsReady) sleep(100);
     while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) sleep(100);
     UI::HideOverlay();
-    app.ManiaTitleControlScriptAPI.PlayMap(url,"","");
-    statusText = "Launched mapId: " + mapId + " from Nadeo Server";
+    app.ManiaTitleControlScriptAPI.PlayMap(url,loadMode,"");
+    statusText = "Launched Map ID: " + mapId + " from Nadeo Server\nMode:" + loadMode;
     NotifyMessage(statusText);
     return true;
 }
 
-void LaunchMap(int mapId) {
+void LaunchMap(int mapId, const string &in loadMode = "") {
     if (!Permissions::PlayLocalMap()) {
         statusText = "Cannot Load Map.  Club access required";  
         NotifyError(statusText);
@@ -134,8 +136,8 @@ void LaunchMap(int mapId) {
     while (!app.ManiaTitleControlScriptAPI.IsReady) sleep(100);
     while (app.Switcher.ModuleStack.Length < 1 || cast<CTrackManiaMenus>(app.Switcher.ModuleStack[0]) is null) sleep(100);
     UI::HideOverlay();
-    app.ManiaTitleControlScriptAPI.PlayMap(url,"","");
-    statusText = "Launched mapId: " + mapId + " from TMX Server";
+    app.ManiaTitleControlScriptAPI.PlayMap(url,loadMode,"");
+    statusText = "Launched Map ID: " + mapId + " from TMX Server\nMode:" + loadMode;
     NotifyMessage(statusText);
 }
 
@@ -281,7 +283,7 @@ int DoesMapExistForMapId(int mapId) {
     yield(); // yield and allow display updates
     // Example API Call
     // https://trackmania.exchange/api/maps?id=123&fields=MapId%2COnlineMapId
-    string mapUrl = "https://trackmania.exchange/api/maps?id=" + mapId + "&fields=MapId%2COnlineMapId";  // new api
+    string mapUrl = "https://trackmania.exchange/api/maps?id=" + mapId + "&fields=MapId%2COnlineMapId" + ',MapType,MapUid';  // new api
     Net::HttpRequest@ mapReq = TmxMapInfoRequestWithRetry(mapUrl);
     yield();  // yield for display updates, even though TMXMapInfoRequestWithRetry will yield internally, we are just adding this to be safe
     if (mapReq !is null) {
@@ -289,6 +291,7 @@ int DoesMapExistForMapId(int mapId) {
         if (code == 200) {
             // check the return json for valid json with a MapId
             Json::Value@ info = mapReq.Json();
+            // print(mapReq.String());
             if (info !is null && info.GetType() == Json::Type::Object && ResultsHaveMapId(info)) { 
                 statusText = "TMX Found MapId:" + mapId;
                 if (lastCheckedOnlineMapId.Length > 0) {
@@ -333,8 +336,15 @@ bool ResultsHaveMapId(Json::Value@ theJson) {
         if (resultsArray.Length > 0) {
             Json::Value@ firstResult = resultsArray[0];
             // Check for MapId
+            lastCheckedMapType = "";
+            lastCheckedOnlineMapId = "";
             if (firstResult.HasKey("MapId")) {
-                lastCheckedOnlineMapId = ResultsHaveOnlineMapId(theJson);
+                if (firstResult.HasKey("OnlineMapId") && firstResult["OnlineMapId"].GetType() == Json::Type::String) {
+                    lastCheckedOnlineMapId = firstResult["OnlineMapId"];
+                }
+                if (firstResult.HasKey("MapType") && firstResult["MapType"].GetType() == Json::Type::String) {
+                    lastCheckedMapType = firstResult["MapType"];
+                }
                 return true;
             }
         } 
@@ -342,27 +352,51 @@ bool ResultsHaveMapId(Json::Value@ theJson) {
     return false;
 }
 
-string ResultsHaveOnlineMapId(Json::Value@ theJson)
-    {   
-    // Look for OnlineMapId in results
-    // Returns the OnlineMapId if it exists, otherwise returns null
+// string ResultsHaveOnlineMapId(Json::Value@ theJson)
+//     {   
+//         //dirt_testing added MapType.. should refactor this as a routine that returns string values
+//         // ie:     string ParseResults(Json::Value@ theJson, string &out mapType, string &out onlineMapId, string &out mapUid) {
 
-    // verify "Results" exists in json and is an array
-    if (theJson.HasKey("Results") && theJson["Results"].GetType() == Json::Type::Array) {
-        Json::Value@ resultsArray = theJson["Results"];
-        // Verify that the array has at least one object
-        if (resultsArray.Length > 0) {
-            Json::Value@ firstResult = resultsArray[0];
-            // Check for MapId
-            if (firstResult.HasKey("OnlineMapId")) {
-                return firstResult["OnlineMapId"];
-            }
-        } 
-    } 
-    return "";
+//     // Look for OnlineMapId in results
+//     // Returns the OnlineMapId if it exists, otherwise returns null
+
+//     // verify "Results" exists in json and is an array
+//     if (theJson.HasKey("Results") && theJson["Results"].GetType() == Json::Type::Array) {
+//         Json::Value@ resultsArray = theJson["Results"];
+//         // Verify that the array has at least one object
+//         if (resultsArray.Length > 0) {
+//             Json::Value@ firstResult = resultsArray[0];
+//             // Check for MapId
+//             if (firstResult.HasKey("OnlineMapId")) {
+//                 return firstResult["OnlineMapId"];
+//             }
+//         } 
+//     } 
+//     return "";
+// }
+
+
+string ModeFromMapType(string &in mapType) {
+    string typeLower = mapType.ToLower();
+    string loadMode = "";
+    if (typeLower.EndsWith("race")) {
+            loadMode = "TrackMania\\TM_PlayMap_Local";
+        } else if (typeLower.EndsWith("stunt")) {
+            loadMode = "Trackmania\\TM_StuntSolo_Local";
+        } else if (typeLower.EndsWith("platform")) {
+            loadMode = "Trackmania\\TM_Platform_Local";
+        } else if (typeLower.EndsWith("royal")) {
+            loadMode = "Trackmania\\TM_RoyalTimeAttack_Local";
+        } else if (typeLower.EndsWith('tm_rounds_online') || typeLower.EndsWith('tm_timeattack_online')) {
+            loadMode = "TrackMania\\TM_PlayMap_Local";
+        } else if (typeLower == "") {
+            loadMode = "TrackMania\\TM_PlayMap_Local";
+        } else {
+            print('unknown mapType: ' + mapType + 'using default load mode');
+            loadMode = "";
+        }
+    return loadMode;
 }
-
-
 
 Net::HttpRequest@ TmxMapInfoRequestWithRetry(const string &in url, uint maxAttempts = 3, uint64 timeoutMs = 2000) {
     // Returns the finished request on success, or null if all attempts failed/timed out.

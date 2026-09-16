@@ -9,7 +9,8 @@
 // Testing Notes:
 // mapID 3163 is a prime map that does not exist, if we need testing for a non exiting map
 // mapID 5040 is last valid map till 15032 so good testing start point for large gaps
-// mpaID 15137 is an interesting test as it returns its own map for some reason when it should not
+// mapID 15137 is an interesting test as it returns its own map for some reason when it should not
+// mapId 353217 is Royal For Testing
 // kinda seems random if the request returns its own numbe or not.. so we'll handle that by just adding some additional maps in the request
 // Map Search also randomly adds, number out of sequence.
 
@@ -67,12 +68,7 @@ void Render() {
         }
         UI::SameLine();
         UI::Text("Load Map With TMX Existence Check");
-        // Launch Current Map Button, bypass TMX check for existence, just attempt to launch the map
-        if (UI::Button("Load Current Map/Bypass TMX Check")) {
-            startnew(LaunchCurrentMap);
-        }
-        UI::SameLine();
-        UI::Text("Kicks to Main Menu if map does not exist.");
+       
         // Launch Next Prime Map Button
         if (UI::Button("Load Next Prime Map")) {
             startnew(FindNextPrimeAndLaunchMap);
@@ -80,11 +76,20 @@ void Render() {
         UI::SameLine();
         UI::Text("Launch next Existing Prime Map");
         // Find Prime Via Map Search
+        if (showDebugOptions) {
+             // Launch Current Map Button, bypass TMX check for existence, just attempt to launch the map
+        if (UI::Button("Load Current Map/Bypass TMX Check")) {
+            startnew(LaunchCurrentMap);
+        }
+        UI::SameLine();
+        UI::Text("Kicks to Main Menu if map does not exist.");
         if (UI::Button("Load Next Prime Map(SearchMaps)")) {
         startnew(RunMapListSearch);
         }
         UI::SameLine();
         UI::Text("Find Next Prime Via SearchMap API\n(Slower, but works when there are\nlarge gap of missing maps)");
+        }
+
 
         if (searching || searchingMapsList) {
             UI::Text("Searching...");

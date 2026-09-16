@@ -8,11 +8,15 @@ bool showInMenuBar = true;
 [Setting category="General" name="Show Main Window"]
 bool showWindow = true;
 
+[Setting category="Debug" name="Show In Debug Buttons" description="You should not need these.  adds [Load with Bypass TMX Check], and [Load Using SearchMaps API] buttons to main window.  Note: Bypassing TMX Check will not support loading map types such as Royal."]
+bool showDebugOptions = false;
+
 // Globals
 bool searching = false;
 bool searchingMapsList = false;
 string statusText = "";
 string lastCheckedOnlineMapId = "";
+string lastCheckedMapType = "";
 uint lastMapSuccessfullyLoaded = 1;
 
 // Global Const
