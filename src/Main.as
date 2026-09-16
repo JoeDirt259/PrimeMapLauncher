@@ -52,7 +52,7 @@ void Render() {
     }
     UI::SetNextWindowSize(550, 400, UI::Cond::FirstUseEver);
     if (UI::Begin(MenuTitle, showWindow)) {
-        UI::TextWrapped("Enter a Map ID to Load or Map ID to use as a starting point for Prime Number Map Search.  " + 
+        UI::TextWrapped("Enter a Map ID to Load or Map ID to use as a starting point for Prime Number Map Search.\n" + 
             "The plugin will search for the next prime number greater than the starting point and attempt to load it.\n" + 
             "Will load directly from Nadeo if possible, otherwise will load from TMX");
         UI::Dummy(vec2(0, 8));
